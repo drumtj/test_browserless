@@ -4,7 +4,11 @@ class Client {
   ready;
   worker;
   sendResolve = {};
+  option;
+  onClickBroadcast;
+  onInputBroadcast;
   constructor(opt){
+    this.option = opt;
     this.ready = new Promise(resolve=>{
       this.worker = new Worker(require.resolve("./worker.js"), {
         workerData: opt
@@ -25,8 +29,41 @@ class Client {
     }
 
     switch(com){
+      case "clickBroadcast":
+        if(typeof this.onClickBroadcast === "function"){
+          // console.error('receive clickBroadcast', data);
+          this.onClickBroadcast(data);
+        }
+      break;
 
+      case "inputBroadcast":
+        if(typeof this.onInputBroadcast === "function"){
+          this.onInputBroadcast(data);
+        }
+      break;
+
+      // case "changeBroadcast":
+      //   if(typeof this.onChangeBroadcast === "function"){
+      //     this.onClickBroadcast(data);
+      //   }
+      // break;
     }
+  }
+
+  dispose(){
+    return this.send("dispose");
+  }
+
+  type(selector, value){
+    return this.send("type", {selector, value});
+  }
+
+  char(value){
+    return this.send("char", value);
+  }
+
+  click(pos){
+    return this.send("click", pos);
   }
 
   genKey(){

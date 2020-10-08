@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer');
 const { parentPort, workerData } = require("worker_threads");
-const PROXY_ZONE_NAME = 'lum-customer-hl_939c0d45-zone-zone1-country-jp';
-const PROXY_ZONE_PASSWORD = 'zf885lt195ss';
+// const PROXY_ZONE_NAME = 'lum-customer-hl_939c0d45-zone-zone1-country-jp';
+// const PROXY_ZONE_PASSWORD = 'zf885lt195ss';
 
 // let page;
 //
@@ -10,6 +10,7 @@ const PROXY_ZONE_PASSWORD = 'zf885lt195ss';
     headless: false,
     devtools: false,
     // ignoreHTTPSErrors: true,
+    timeout : 0,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -21,14 +22,26 @@ const PROXY_ZONE_PASSWORD = 'zf885lt195ss';
   }
 
   if(workerData.width){
+    puppeteerOptions.defaultViewport = {
+      width: workerData.width,
+      height: workerData.height
+    }
     puppeteerOptions.args.push(`--window-size=${workerData.width},${workerData.height}`);
   }
 
-  const browser = await puppeteer.launch(puppeteerOptions);
-  var page = (await browser.pages())[0];
-  if(workerData.width){
-    page.setViewport({width: workerData.width, height: workerData.height});
+  if(workerData.position){
+    puppeteerOptions.args.push(`--window-position=${workerData.position}`);
   }
+
+  const browser = await puppeteer.launch(puppeteerOptions);
+  const page0 = (await browser.pages())[0];
+  const context = await browser.createIncognitoBrowserContext();
+  // Create a new page in a pristine context.
+  const page = await context.newPage();
+  await page0.close();
+  // if(workerData.width){
+  //   page.setViewport({width: workerData.width, height: workerData.height - 150});
+  // }
   // const page = await browser.newPage();
   // const page = await browser.pages(0);
 
@@ -47,17 +60,111 @@ const PROXY_ZONE_PASSWORD = 'zf885lt195ss';
         await page.goto(data);
       break;
 
+      case "click":
+        // page.evaluate(()=>{
+        //   console.error('click', data);
+        // })
+        await page.mouse.click(data.x, data.y);
+      break;
+
+      case "char":
+        await page.keyboard.sendCharacter(data);
+      break;
+
+      case "type":
+        // page.evaluate(()=>{
+        //   console.error('type', data);
+        // })
+        await page.type(data.selector, data.value);
+      break;
+
+      case "dispose":
+        await browser.close();
+      break;
+
       case "test":
 
-        await page.goto(data.url);
+        // await page.goto(data.url);
         // await page.waitForSelector("#usernameInput", {visible:true});
         // await page.type("#usernameInput", "tj"+Math.round(Math.random()*1000));
         // await page.tap("#btn_play");
         //
-        await page.waitForSelector("#pinNumber", {visible:true});
-        await page.type("#pinNumber", data.roomNum);
-        await page.type("#sender", "tj"+data.i);
-        await page.tap("#openpincheck");
+        // (async ()=>{
+          await page.goto(data.url);
+          await page.waitForSelector("#pinNumber", {visible:true});
+          await page.type("#pinNumber", data.roomNum);
+          await page.type("#sender", "tj"+(workerData.index+1)+Math.floor(Math.random()*100));
+          await page.tap("#openpincheck");
+          try{
+            await page.waitForNavigation();
+          }catch(e){
+
+          }
+          // await page.waitForSelector(".wrap-midst", {visible:true});
+
+          // const window = await page.evaluateHandle(() => window);
+          // window.addEventListener('click', e=>{
+          //   console.error(e.clientX, e.clientY);
+          //   parentPort.postMessage({com:"clickBroadcast", data:{x:e.clientX, y:e.clientY, id:workerData.index}});
+          // })
+          //
+          if(workerData.index == 0){
+            await page.exposeFunction('clickBroadcast', pos => {
+              pos.id = workerData.index;
+              // console.error("clickBroadcast", pos);
+              parentPort.postMessage({com:"clickBroadcast", data:pos});
+            });
+
+            await page.exposeFunction('inputBroadcast', data => {
+              data.id = workerData.index;
+              // console.error("inputBroadcast", data);
+              parentPort.postMessage({com:"inputBroadcast", data:data});
+            });
+
+            // await page.exposeFunction('changeBroadcast', data => {
+            //   data.id = workerData.index;
+            //   console.error("changeBroadcast", data);
+            //   parentPort.postMessage({com:"changeBroadcast", data:data});
+            // });
+
+            page.on('domcontentloaded', e=>{
+              page.evaluate(()=>{
+                console.error("hi1");
+                window.addEventListener('click', e=>{
+                  console.error("click", e.clientX, e.clientY);
+                  // setTimeout(()=>{
+                    window.clickBroadcast({x:e.clientX, y:e.clientY});
+                  // }, 100);
+                })
+                // wsJoinRoom()
+                window.addEventListener('input', e=>{
+                  console.error('input', e);
+                  window.inputBroadcast({value:e.data});
+                })
+                // window.addEventListener('change', e=>{
+                //   let data = {selector:'#'+e.target.id, value:e.target.value};
+                //   console.error('change', data);
+                //   window.changeBroadcast(data);
+                // })
+              })
+            })
+          }else{
+            page.on('domcontentloaded', e=>{
+              page.evaluate(()=>{
+                console.error("hi2");
+                window.addEventListener('click', e=>{
+                  console.error(e.clientX, e.clientY);
+                })
+                window.addEventListener('input', e=>{
+                  console.error('input', e.data);
+                })
+                // window.addEventListener('change', e=>{
+                //   console.error('type. change2', data);
+                // })
+              })
+            })
+          }
+        // })()
       break;
     }
 
